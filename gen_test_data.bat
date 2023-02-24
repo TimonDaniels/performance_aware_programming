@@ -1,0 +1,1 @@
+go run gen_test_data.go > data_10000000_flex.json
