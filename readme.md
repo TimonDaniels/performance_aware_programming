@@ -1,9 +1,9 @@
-Performance Oriented Programming
-================================
+Performance-Aware Programming
+=============================
 
 Course by Casey Muratori at
 
-	https://www.computerenhance.com/
+	https://www.computerenhance.com
 
 
 Haversine Distance Problem
