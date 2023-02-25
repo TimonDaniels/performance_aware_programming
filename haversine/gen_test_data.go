@@ -6,16 +6,16 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"time"
 )
 
 const (
 	outputFile = `data_10000000_flex.json`
 	count      = 10000000
+	randomSeed = 1
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
+	rand.Seed(randomSeed)
 
 	f, err := os.Create(outputFile)
 	if err != nil {
