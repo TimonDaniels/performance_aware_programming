@@ -1,52 +1,57 @@
 Performance Oriented Programming
 ================================
 
-
 Course by Casey Muratori at
 
 	https://www.computerenhance.com/
 
 
-First baseline measurements with Python from the original listing 21:
+Haversine Distance Problem
+==========================
 
-# Run 1
+**First** generate the test data file by running `gen_test_data.go`.
+
+	cd haversine
+	go run gen_test_data.go
+
+This will create `data_10000000_flex.json`. This is necessary for the other
+code to run.
+
+
+The original Python code (listing 21), presented in the course is in
+`haversine/haversine_python`.
+
+I rewrote the Python code in Go, not changing it, only adopting it to the
+language. See `haversine/haversine_go`.
+
+Finally, I tried my best to create the fastest Go version possible. See
+`haversine/haversine_go_fast`
+
+```
+Python:
 	Result: 10009.199094314288
-	Input = 17.723998546600342 seconds
-	Math = 18.187000513076782 seconds
-	Total = 35.910999059677124 seconds
-	Throughput = 278466 haversines/second
+	Input = 19.12956738471985 seconds
+	Math = 18.487126350402832 seconds
+	Total = 37.61669373512268 seconds
+	Throughput = 265839.418807374 haversines/second
 
-# Run 2
+Go:
 	Result: 10009.199094314288
-	Input = 18.552680492401123 seconds
-	Math = 17.66699719429016 seconds
-	Total = 36.219677686691284 seconds
-	Throughput = 276093 haversines/second
+	Input = 20.1963482s
+	Math = 1.1721565s
+	Total = 21.3685047s
+	Throughput = 467978.463649822 haversines/second
 
-So roughly:
-	Throughput = 277000 haversines/second
+Optimized Go:
+	Result: 10009.199094315622
+	Threads = 8
+	Count = 10000000
+	Total = 518.254ms
+	Throughput = 19295558 haversines/second
+```
 
+The optimized Go version is 41 times faster than the original Go version and
+72.5 times faster than the original Python version.
 
-Now a baseline with the same code translated to Go:
-
-	Result: 10009.199094314288
-	Input = 19.1525366s
-	Math = 1.1659993s
-	Total = 20.3185359s
-	Throughput = 492161 haversines/second
-
-	Result: 10009.199094314288
-	Input = 19.529693s
-	Math = 1.1883386s
-	Total = 20.7180316s
-	Throughput = 482671 haversines/second
-
-So roughly:
-	Throughput = 487000 haversines/second
-
-
-The first hand-rolled Go version with custom JSON parsing:
-
-	Result: 10009.199094314288
-	Total = 3.6980314s
-	Throughput = 2704141 haversines/second
+Note that due to a different order of summation, rounding errors propagate
+differently for the optimized version, thus we get a slightly different result.

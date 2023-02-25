@@ -2,7 +2,7 @@ from math import radians, sin, cos, sqrt, asin
 import time
 import json
 
-JSONFile = open('data_10000000_flex.json')
+JSONFile = open('../data_10000000_flex.json')
 
 #
 # Read the input

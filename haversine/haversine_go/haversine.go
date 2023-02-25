@@ -1,5 +1,3 @@
-//+build ignore
-
 package main
 
 import (
@@ -10,7 +8,7 @@ import (
 	"time"
 )
 
-const JSONFile = `data_10000000_flex.json`
+const JSONFile = `../data_10000000_flex.json`
 
 type Input struct {
 	Pairs []Pair `json:"pairs"`
