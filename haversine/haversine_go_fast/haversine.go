@@ -279,6 +279,7 @@ func haversineOfDegrees(x0, y0, x1, y1, radius float64) float64 {
 		return x * x
 	}
 
+	sin := math.Sin
 	cos := math.Cos
 	asin := math.Asin
 	sqrt := math.Sqrt
@@ -288,7 +289,7 @@ func haversineOfDegrees(x0, y0, x1, y1, radius float64) float64 {
 	y0 = radians(y0)
 	y1 = radians(y1)
 
-	rootTerm := square(cos(dY/2-math.Pi/2)) + cos(y0)*cos(y1)*(square(cos(dX/2-math.Pi/2)))
+	rootTerm := square(sin(dY/2)) + cos(y0)*cos(y1)*(square(sin(dX/2)))
 	result := 2 * radius * asin(sqrt(rootTerm))
 
 	return result
