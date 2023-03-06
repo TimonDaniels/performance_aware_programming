@@ -117,27 +117,27 @@ func haversineAverage(data []byte) (sum float64, count int) {
 		c := data[pos]
 		switch state {
 		case findX0:
-			if c == 'x' {
-				// When we point to the 'x' in
+			if c == '"' {
+				// When we point to the first quotes in
 				//
 				// 	"x0":65.477371, ...
-				//
-				// we know that the start of the number is 4 right of the 'x'.
-				x0start = pos + 4
+				// 	^
+				// we know that the start of the number is 5 right of the '"'.
+				x0start = pos + 5
 
 				// The shortest possible number string has exactly one digit
 				// before the decimal point, like this:
 				//
 				//	 "x0":0.123456, ...
-				// 	  ^^^^^^^^^^^^     <- Skip these 12 characters.
+				// 	 ^^^^^^^^^^^^^     <- Skip these 13 characters.
 				//
-				// We are at the 'x' so know that we can always at least skip 12
+				// We are at the '"' so know that we can always at least skip 13
 				// characters to find the comma after the number.
 				// If the number is longer, fine, we will keep looking for the
 				// comma in the parse state.
-				// We skip 11 here in the if and 1 after the if,
+				// We skip 12 here in the if and 1 after the if,
 				// unconditionally.
-				pos += 11
+				pos += 12
 				state = parseX0
 			}
 			pos++
@@ -152,9 +152,9 @@ func haversineAverage(data []byte) (sum float64, count int) {
 			}
 			pos++
 		case findY0:
-			if c == 'y' {
-				y0start = pos + 4
-				pos += 11
+			if c == '"' {
+				y0start = pos + 5
+				pos += 12
 				state = parseY0
 			}
 			pos++
@@ -166,9 +166,9 @@ func haversineAverage(data []byte) (sum float64, count int) {
 			}
 			pos++
 		case findX1:
-			if c == 'x' {
-				x1start = pos + 4
-				pos += 11
+			if c == '"' {
+				x1start = pos + 5
+				pos += 12
 				state = parseX1
 			}
 			pos++
@@ -180,9 +180,9 @@ func haversineAverage(data []byte) (sum float64, count int) {
 			}
 			pos++
 		case findY1:
-			if c == 'y' {
-				y1start = pos + 4
-				pos += 11
+			if c == '"' {
+				y1start = pos + 5
+				pos += 12
 				state = parseY1
 			}
 			pos++
@@ -279,7 +279,6 @@ func haversineOfDegrees(x0, y0, x1, y1, radius float64) float64 {
 		return x * x
 	}
 
-	sin := math.Sin
 	cos := math.Cos
 	asin := math.Asin
 	sqrt := math.Sqrt
@@ -289,7 +288,7 @@ func haversineOfDegrees(x0, y0, x1, y1, radius float64) float64 {
 	y0 = radians(y0)
 	y1 = radians(y1)
 
-	rootTerm := square(sin(dY/2)) + cos(y0)*cos(y1)*(square(sin(dX/2)))
+	rootTerm := square(cos(dY/2-math.Pi/2)) + cos(y0)*cos(y1)*(square(cos(dX/2-math.Pi/2)))
 	result := 2 * radius * asin(sqrt(rootTerm))
 
 	return result
