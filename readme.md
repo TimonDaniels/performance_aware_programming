@@ -29,29 +29,29 @@ Finally, I tried my best to create the fastest Go version possible. See
 
 ```
 Python:
-	Result: 10009.199094314288
-	Input = 19.12956738471985 seconds
-	Math = 18.487126350402832 seconds
-	Total = 37.61669373512268 seconds
-	Throughput = 265839.418807374 haversines/second
+	Result: 10007.8833106713
+	Input = 17.622838020324707 seconds
+	Math = 19.40399718284607 seconds
+	Total = 37.026835203170776 seconds
+	Throughput = 270074.39186008676 haversines/second
 
 Go:
-	Result: 10009.199094314288
-	Input = 20.1963482s
-	Math = 1.1721565s
-	Total = 21.3685047s
-	Throughput = 467978.463649822 haversines/second
+	Result: 10007.8833106713
+	Input = 17.8604208s
+	Math = 1.1329996s
+	Total = 18.9934204s
+	Throughput = 526498.1129991731 haversines/second
 
 Optimized Go:
-	Result: 10009.199094315622
+	Result: 10007.88331067118
 	Threads = 8
 	Count = 10000000
-	Total = 518.254ms
-	Throughput = 19295558 haversines/second
+	Total = 377.4745ms
+	Throughput = 26491856 haversines/second
 ```
 
-The optimized Go version is 41 times faster than the original Go version and
-72.5 times faster than the original Python version.
+The optimized Go version is about 50 times faster than the original Go version
+and about 100 times faster than the original Python version.
 
 Note that due to a different order of summation, rounding errors propagate
 differently for the optimized version, thus we get a slightly different result.

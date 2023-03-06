@@ -21,9 +21,7 @@ func main() {
 	// Memory-map the file.
 
 	inputFile, err := os.OpenFile(JSONFile, os.O_RDWR, 0644)
-	// TODO Why is this so costly? Look at the generated code. Checking this
-	// error seems to decrease performance by 3 to 4 % for some reason.
-	//check(err)
+	check(err)
 	defer inputFile.Close()
 
 	// data holds the contents of the file as a []byte.
@@ -72,14 +70,13 @@ func main() {
 }
 
 // splitAtPairBoundaries returns the indices at which to split data into parts.
-// Splits are moved to the next line break in order not to split in the middle
-// of a pair. We want to split at "x0" data in the JSON file.
-// The returned indices start at 0 and end at len(data).
-// For example, splitting 100 bytes into 4 parts results in:
+// Each part starts at a pair, the first part always starts at 0, the others
+// start at "x0".The last item in the returned array is always len(data). For
+// example, splitting 100 bytes into 4 parts results in:
 //
 // 	[0, 25, 50, 75, 100]
 //
-// meaning four intervals: [0,25], [25,50], [50,75], [75,100].
+// creating four intervals: [0,25], [25,50], [50,75], [75,100].
 func splitAtPairBoundaries(data []byte, parts int) []int {
 	splits := []int{0} // First marker is always at 0.
 
@@ -88,7 +85,7 @@ func splitAtPairBoundaries(data []byte, parts int) []int {
 		for data[start] != '\n' {
 			start++
 		}
-		splits = append(splits, start)
+		splits = append(splits, start+3)
 	}
 
 	splits = append(splits, len(data)) // Last marker is always at the end.
@@ -97,114 +94,116 @@ func splitAtPairBoundaries(data []byte, parts int) []int {
 }
 
 func haversineAverage(data []byte) (sum float64, count int) {
-	// These are the states we iterate through. We know the order of the values
-	// in the file: x0, y0, x1, y1 for each line.
-	const (
-		findX0 = iota
-		parseX0
-		findY0
-		parseY0
-		findX1
-		parseX1
-		findY1
-		parseY1
-	)
-	state := findX0
+	// The data looks like this:
+	//
+	// {"pairs":[
+	// 	{"x0":37.677704, "y0":79.291636, "x1":59.241619, "y1":-11.211446},
+	// 	{"x0":-27.130501, "y0":33.628153, "x1":-156.370673, "y1":-61.826534},
+	// 	...
+	// 	{"x0":53.442258, "y0":85.797202, "x1":155.772353, "y1":-36.418042},
+	// 	{"x0":-98.188135, "y0":8.463621, "x1":-58.979798, "y1":85.554110}
+	// ]}
+	//
+	// and in this function we are given a part of that, either:
+	//
+	// {"pairs":[
+	// 	{"x0":37.677704, "y0":79.291636, "x1":59.241619, "y1":-11.211446},
+	// 	{"x0":-27.130501, "y0":33.628153, "x1":-156.370673, "y1":-61.826534},
+	// 	{
+	//
+	// at the start, or:
+	//
+	// "x0":37.677704, "y0":79.291636, "x1":59.241619, "y1":-11.211446},
+	// 	{"x0":-27.130501, "y0":33.628153, "x1":-156.370673, "y1":-61.826534},
+	// 	{
+	//
+	// for middle parts, or:
+	//
+	// "x0":53.442258, "y0":85.797202, "x1":155.772353, "y1":-36.418042},
+	// 	{"x0":-98.188135, "y0":8.463621, "x1":-58.979798, "y1":85.554110}
+	// ]}
+	//
+	// at the end. See splitAtPairBoundaries for how these are split.
 
-	var x0start, x0end, y0start, y0end, x1start, x1end, y1start, y1end int
 	pos := 0
-	for pos < len(data) {
-		c := data[pos]
-		switch state {
-		case findX0:
-			if c == '"' {
-				// When we point to the first quotes in
-				//
-				// 	"x0":65.477371, ...
-				// 	^
-				// we know that the start of the number is 5 right of the '"'.
-				x0start = pos + 5
 
-				// The shortest possible number string has exactly one digit
-				// before the decimal point, like this:
-				//
-				//	 "x0":0.123456, ...
-				// 	 ^^^^^^^^^^^^^     <- Skip these 13 characters.
-				//
-				// We are at the '"' so know that we can always at least skip 13
-				// characters to find the comma after the number.
-				// If the number is longer, fine, we will keep looking for the
-				// comma in the parse state.
-				// We skip 12 here in the if and 1 after the if,
-				// unconditionally.
-				pos += 12
-				state = parseX0
-			}
-			pos++
-		case parseX0:
-			if c == ',' || c == '}' {
-				x0end = pos
-				// We can skip an extra character, since a comma is followed by
-				// a space and a closing brace is followed by a comma or line
-				// break.
-				pos++
-				state = findY0
-			}
-			pos++
-		case findY0:
-			if c == '"' {
-				y0start = pos + 5
-				pos += 12
-				state = parseY0
-			}
-			pos++
-		case parseY0:
-			if c == ',' || c == '}' {
-				y0end = pos
-				pos++
-				state = findX1
-			}
-			pos++
-		case findX1:
-			if c == '"' {
-				x1start = pos + 5
-				pos += 12
-				state = parseX1
-			}
-			pos++
-		case parseX1:
-			if c == ',' || c == '}' {
-				x1end = pos
-				pos++
-				state = findY1
-			}
-			pos++
-		case findY1:
-			if c == '"' {
-				y1start = pos + 5
-				pos += 12
-				state = parseY1
-			}
-			pos++
-		case parseY1:
-			if c == ',' || c == '}' {
-				y1end = pos
-				pos++
-				state = findX0 // Go back to the start, parse the next pair.
+	// Set pos to the first '"' at the start of "x0":... by finding 'x' and then
+	// stepping back by one.
+	for data[pos] != 'x' {
+		pos++
+	}
+	pos--
 
-				// We have a complete pair. Parse it and calculate its distance.
+	totalEnd := len(data) - 8
+	for pos < totalEnd {
+		// Our pos is at the quotes in "x0":... and we keep it there in each
+		// iteration.
+		//
+		// The number can have these forms:
+		//
+		// 	"x0":1.123456, ...
+		// 	"x0":12.123456, ...
+		// 	"x0":123.123456, ...
+		// 	"x0":-123.123456, ...
+		// 	_^^^^^ <- skip 5 bytes from the '"' to get the number start.
+		//
+		// meaning we have 8, 9, 10 or 11 bytes in each number.
 
-				x0 := parseFloat(data[x0start:x0end])
-				y0 := parseFloat(data[y0start:y0end])
-				x1 := parseFloat(data[x1start:x1end])
-				y1 := parseFloat(data[y1start:y1end])
-
-				const EarthRadiuskm = 6371
-				sum += haversineOfDegrees(x0, y0, x1, y1, EarthRadiuskm)
-				count++
-			}
-			pos++
+		x0start := pos + 5
+		x0end := x0start + 8 // Assume 8 byte number.
+		if data[x0end+1] == ',' {
+			x0end++ // This is a 9 byte number.
+		} else if data[x0end+2] == ',' {
+			x0end += 2 // This is a 10 byte number.
+		} else if data[x0end+3] == ',' {
+			x0end += 3 // This is a 11 byte number.
 		}
+
+		// {"x0":53.442258, "y0":85.797202, ...
+		y0start := x0end + 7
+		y0end := y0start + 8
+		if data[y0end+1] == ',' {
+			y0end++
+		} else if data[y0end+2] == ',' {
+			y0end += 2
+		} else if data[y0end+3] == ',' {
+			y0end += 3
+		}
+
+		// ... "y0":85.797202, "x1":155.772353, ...
+		x1start := y0end + 7
+		x1end := x1start + 8
+		if data[x1end+1] == ',' {
+			x1end++
+		} else if data[x1end+2] == ',' {
+			x1end += 2
+		} else if data[x1end+3] == ',' {
+			x1end += 3
+		}
+
+		// ... "x1":155.772353, "y1":-36.418042},
+		y1start := x1end + 7
+		y1end := y1start + 8
+		if data[y1end+1] == '}' {
+			y1end++
+		} else if data[y1end+2] == '}' {
+			y1end += 2
+		} else if data[y1end+3] == '}' {
+			y1end += 3
+		}
+
+		pos = y1end + 5
+
+		// We have a complete pair. Parse it and calculate its distance.
+
+		x0 := parseFloat(data[x0start:x0end])
+		y0 := parseFloat(data[y0start:y0end])
+		x1 := parseFloat(data[x1start:x1end])
+		y1 := parseFloat(data[y1start:y1end])
+
+		const EarthRadiuskm = 6371
+		sum += haversineOfDegrees(x0, y0, x1, y1, EarthRadiuskm)
+		count++
 	}
 
 	return
