@@ -11,7 +11,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": "listing_0039_more_movs"
+            "args": "listing_0041_add_sub_cmp_jnz"
         }
     ]
 }
