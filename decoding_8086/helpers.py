@@ -12,6 +12,22 @@ def add_bytearrays(a: bytearray, b: bytearray) -> bytearray:
     return bytearray(result_val.to_bytes(length, byteorder='little'))
 
 
+def set_bit(byte_array: bytearray, bit_position: int, value: int) -> bytearray:
+    assert value in (0, 1), "Value must be either 0 or 1"
+    byte_index = bit_position // 8
+    bit_index = bit_position % 8
+    if byte_index < len(byte_array):
+        byte_array[byte_index] |= (value << bit_index)
+    return byte_array
+
+
+def is_bit_set(byte_array, bit_position):
+    byte_index = bit_position // 8
+    bit_index = bit_position % 8
+    assert byte_index <= len(byte_array), "Byte index out of range"
+    return bool(byte_array[byte_index] & (1 << bit_index))
+
+
 @dataclass(frozen=True)
 class FieldEncoding:
     op: bytes = None
@@ -26,11 +42,11 @@ class FieldEncoding:
 @dataclass(frozen=True)
 class AsmInstruction:
     operation: str
-    destination: str
     dest_value: bytearray
-    source: str
-    src_value: bytearray
-    byte_size: str
+    destination: str = None
+    source: str = None
+    src_value: bytearray = None
+    byte_size: str = None
 
 
 def format_bytearray(byte_arr: bytearray) -> str:
@@ -43,7 +59,10 @@ def gen_assembly(asm_instruction: AsmInstruction) -> str:
     """
     Generate assembly code from an AsmInstruction object.
     """
-    if asm_instruction.byte_size:
+    # TODO: see if source is a immediate value and check if it is a postive or negative value
+    if asm_instruction.operation == 'jnz':
+        return f"{asm_instruction.operation} {int.from_bytes(asm_instruction.dest_value, byteorder='little')}"
+    elif asm_instruction.byte_size:
         return f"{asm_instruction.operation} {asm_instruction.byte_size} {asm_instruction.destination}, {asm_instruction.source}"
     else:
         return f"{asm_instruction.operation} {asm_instruction.destination}, {asm_instruction.source}"

@@ -1,7 +1,7 @@
 from helpers import add_bytearrays
 
 IP_REG = bytearray([0, 0])
-FLAGS_REG = bytearray([0, 0])
+FLAGS_REG = bytearray([0, 0])   # ZF, PF, SF, CF, OF, AF, DF, IF
 
 FULL_REG_STORAGE = [
     bytearray([0, 0]),

@@ -1,8 +1,8 @@
 from enum import Enum
 from typing import Tuple
 
-from helpers import FieldEncoding, AsmInstruction, add_bytearrays, format_bytearray, gen_assembly
-from tables import FULL_REG_STORAGE, OP_TABLE, REG_TABLE, REG_STORAGE, R_M_TABLE, R_M_STORAGE, IP_REG
+from helpers import FieldEncoding, AsmInstruction, add_bytearrays, format_bytearray, gen_assembly, is_bit_set, set_bit
+from tables import FLAGS_REG, FULL_REG_STORAGE, OP_TABLE, REG_TABLE, REG_STORAGE, R_M_TABLE, R_M_STORAGE, IP_REG
 
 
 INSTUCTION_SPACING = 35
@@ -103,6 +103,7 @@ def decode_field_encoding(ins: bytearray, pattern: DecodePattern) -> Tuple[Field
     
 def decode_instruction(encoding: FieldEncoding, pattern: DecodePattern, ins: bytearray):
     byte_size = None
+    decoded_bytes = 0
     try:
         if pattern == DecodePattern.DEFAULT:
             operation = OP_TABLE[encoding.op]
@@ -137,7 +138,9 @@ def decode_instruction(encoding: FieldEncoding, pattern: DecodePattern, ins: byt
             asm_instruction = AsmInstruction(
                 operation=operation,
                 destination=destination,
+                dest_value=dest_value,
                 source=source,
+                src_value=src_value,
                 byte_size=byte_size
             )
 
@@ -156,7 +159,9 @@ def decode_instruction(encoding: FieldEncoding, pattern: DecodePattern, ins: byt
             asm_instruction = AsmInstruction(
                 operation=operation,
                 destination=destination,
+                dest_value=dest_value,
                 source=source,
+                src_value=src_value,
                 byte_size=byte_size
             )
 
@@ -177,10 +182,11 @@ def decode_instruction(encoding: FieldEncoding, pattern: DecodePattern, ins: byt
             elif encoding.mod == 0b01:
                 byte_size = 'word' if encoding.w else 'byte'
                 destination = '[' + R_M_TABLE[encoding.r_m] + f' + {ins[2]}' + ']'
-                dest_value = add_bytearrays(R_M_STORAGE[encoding.r_m], bytearray([ins[2]]))
+                displacement = bytearray([ins[2]]) if encoding.w == 0 else bytearray([ins[2], 0x00])
+                dest_value = add_bytearrays(R_M_STORAGE[encoding.r_m], displacement)
                 decoded_bytes += 1
             elif encoding.mod == 0b10:
-                byte_size = 'word' if encoding.w else 'byte'
+                byte_size = 'word' # if encoding.w else 'byte'
                 destination = '[' + R_M_TABLE[encoding.r_m] + f' + {ins[2] | (ins[3] << 8)}' + ']'
                 dest_value = add_bytearrays(R_M_STORAGE[encoding.r_m], bytearray([ins[2], ins[3]]))
                 decoded_bytes += 2
@@ -195,7 +201,9 @@ def decode_instruction(encoding: FieldEncoding, pattern: DecodePattern, ins: byt
             asm_instruction = AsmInstruction(
                 operation=operation,
                 destination=destination,
+                dest_value=dest_value,
                 source=source,
+                src_value=src_value,
                 byte_size=byte_size
             )
         
@@ -216,12 +224,19 @@ def decode_instruction(encoding: FieldEncoding, pattern: DecodePattern, ins: byt
             asm_instruction = AsmInstruction(
                 operation=operation,
                 destination=destination,
+                dest_value=dest_value,
                 source=source,
+                src_value=src_value,
                 byte_size=byte_size
             )
         
         elif pattern == DecodePattern.JUMP:
             operation = OP_TABLE[encoding.op]
+            dest_value = bytearray([ins[decoded_bytes]])
+            asm_instruction = AsmInstruction(
+                operation=operation,
+                dest_value=dest_value,
+            )
 
         assert isinstance(operation, str), "Operation must be a string"
         assert isinstance(dest_value, bytearray), "Destination value must be a bytearray"
@@ -235,6 +250,8 @@ def decode_instruction(encoding: FieldEncoding, pattern: DecodePattern, ins: byt
 
 
 def evaluate_instruction(asm_instruction: AsmInstruction):
+    global FLAGS_REG, IP_REG
+
     # Compute instruction
     dest_init_value = asm_instruction.dest_value[:]
     if asm_instruction.operation == 'mov':
@@ -243,6 +260,21 @@ def evaluate_instruction(asm_instruction: AsmInstruction):
         asm_instruction.dest_value[:] = add_bytearrays(asm_instruction.dest_value, asm_instruction.src_value)
     elif asm_instruction.operation == 'sub':
         asm_instruction.dest_value[:] = add_bytearrays(asm_instruction.dest_value, asm_instruction.src_value)
+    elif asm_instruction.operation == 'jnz':
+        IP_REG[:] = add_bytearrays(IP_REG, asm_instruction.dest_value) if is_bit_set(FLAGS_REG, 0) else IP_REG[:]
+
+    # Set the flags register based on the result of the operation
+    dest_int = int.from_bytes(asm_instruction.dest_value, byteorder='little')
+    if dest_int == 0:
+        FLAGS_REG = set_bit(FLAGS_REG, 0, 1)
+    else:
+        FLAGS_REG = set_bit(FLAGS_REG, 0, 0)
+    if asm_instruction.dest_value >= bytearray([0x80, 0x00]):
+        # if the reg value is larger or equal to 0x8000, it means the sign bit is set 
+        FLAGS_REG = set_bit(FLAGS_REG, 2, 1)
+    else:
+        FLAGS_REG = set_bit(FLAGS_REG, 2, 0)
+        
     return dest_init_value, asm_instruction
 
 
@@ -259,7 +291,7 @@ def decode(filename: str):
         instruction_start = DECODED_BYTES
         pattern = get_decode_pattern(ins[instruction_start:])
         encoding, decoded_bytes_1 = decode_field_encoding(ins[instruction_start:], pattern)
-        asm_instruction, decoded_bytes_2 = decode_instruction(ins[instruction_start:])
+        asm_instruction, decoded_bytes_2 = decode_instruction(encoding, pattern, ins[instruction_start:])
         DECODED_BYTES += decoded_bytes_1 + decoded_bytes_2
         dest_init_value, asm_instruction = evaluate_instruction(asm_instruction)
 
@@ -284,50 +316,5 @@ if __name__ == '__main__':
     if len(sys.argv) != 2:
         print("Usage: python decode_ins.py <filename>")
         sys.exit(1)
-        # Compute instruction
-        dest_init_value = dest_value[:]
-        if operation == 'mov':
-            dest_value[:] = src_value[:]
-        elif operation == 'add':
-            dest_value[:] = add_bytearrays(dest_value, src_value)
-        elif operation == 'sub':
-            dest_value[:] = add_bytearrays(dest_value, src_value)
 
-        # Print the instruction and machine code
-        machine_code_str = ' '.join([f"{ins[i]:08b}" for i in range(decoded_bytes)])
-        asm_instruction_str = gen_assembly(asm_instruction)
-        print("{:<{width}} | {}".format(asm_instruction_str, machine_code_str, width=INSTUCTION_SPACING))    
-
-        # Print the instruction and evaluated result 
-        print(f"{asm_instruction_str:<{INSTUCTION_SPACING}} | {asm_instruction.destination}:{format_bytearray(dest_init_value)} -> {format_bytearray(dest_value)}")        # Compute instruction
-        dest_init_value = dest_value[:]
-        if operation == 'mov':
-            dest_value[:] = src_value[:]
-        elif operation == 'add':
-            dest_value[:] = add_bytearrays(dest_value, src_value)
-        elif operation == 'sub':
-            dest_value[:] = add_bytearrays(dest_value, src_value)
-
-        # Print the instruction and machine code
-        machine_code_str = ' '.join([f"{ins[i]:08b}" for i in range(decoded_bytes)])
-        asm_instruction_str = gen_assembly(asm_instruction)
-        print("{:<{width}} | {}".format(asm_instruction_str, machine_code_str, width=INSTUCTION_SPACING))    
-
-        # Print the instruction and evaluated result 
-        print(f"{asm_instruction_str:<{INSTUCTION_SPACING}} | {asm_instruction.destination}:{format_bytearray(dest_init_value)} -> {format_bytearray(dest_value)}")        # Compute instruction
-        dest_init_value = dest_value[:]
-        if operation == 'mov':
-            dest_value[:] = src_value[:]
-        elif operation == 'add':
-            dest_value[:] = add_bytearrays(dest_value, src_value)
-        elif operation == 'sub':
-            dest_value[:] = add_bytearrays(dest_value, src_value)
-
-        # Print the instruction and machine code
-        machine_code_str = ' '.join([f"{ins[i]:08b}" for i in range(decoded_bytes)])
-        asm_instruction_str = gen_assembly(asm_instruction)
-        print("{:<{width}} | {}".format(asm_instruction_str, machine_code_str, width=INSTUCTION_SPACING))    
-
-        # Print the instruction and evaluated result 
-        print(f"{asm_instruction_str:<{INSTUCTION_SPACING}} | {asm_instruction.destination}:{format_bytearray(dest_init_value)} -> {format_bytearray(dest_value)}")
     decode(sys.argv[1])

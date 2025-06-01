@@ -1,1 +1,4 @@
 haversine/data_10000000_flex.json
+
+# folders
+__pycache__/
