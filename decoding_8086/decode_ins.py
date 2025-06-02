@@ -79,7 +79,7 @@ def decode_field_encoding(ins: bytearray, pattern: DecodePattern) -> Tuple[Field
         r_m_code = (ins[1] & 0b00000111)
         field_encoding = FieldEncoding(
             op=op_code,
-            d=s_code,
+            s=s_code,
             w=w_code,
             r_m=r_m_code,
             mod=mod_code
@@ -116,12 +116,12 @@ def decode_instruction(encoding: FieldEncoding, pattern: DecodePattern, ins: byt
                 r_m = '[' + R_M_TABLE[encoding.r_m] + ']'
                 r_m_value = R_M_STORAGE[encoding.r_m]
             elif encoding.mod == 0b01:
-                r_m = '[' + R_M_TABLE[encoding.r_m] + f' + {ins[2]}' + ']'
+                r_m = '[' + R_M_TABLE[encoding.r_m] + f' + {ins[0]}' + ']'
                 r_m_value = add_bytearrays(R_M_STORAGE[encoding.r_m] + bytearray(ins[2]))
                 decoded_bytes += 1
             elif encoding.mod == 0b10:
-                r_m = '[' + R_M_TABLE[encoding.r_m] + f' + {ins[2] | (ins[3] << 8)}' + ']'
-                r_m_value = add_bytearrays(R_M_STORAGE[encoding.r_m] + bytearray([ins[2], ins[3]]))
+                r_m = '[' + R_M_TABLE[encoding.r_m] + f' + {ins[0] | (ins[1] << 8)}' + ']'
+                r_m_value = add_bytearrays(R_M_STORAGE[encoding.r_m] + bytearray([ins[0], ins[1]]))
                 decoded_bytes += 2
             else:
                 raise ValueError("Invalid mod_code, value is greater than 3")
@@ -149,12 +149,12 @@ def decode_instruction(encoding: FieldEncoding, pattern: DecodePattern, ins: byt
             destination = REG_TABLE[encoding.reg][encoding.w]
             dest_value = REG_STORAGE[encoding.w][encoding.reg]
             if encoding.w == 0:
-                source = f'{ins[1]}'
-                src_value = bytearray([ins[1]])
+                source = ins[0]
+                src_value = bytearray([ins[0]])
                 decoded_bytes += 1
             else:
-                source = f'{ins[1] | (ins[2] << 8)}'
-                src_value = bytearray([ins[1], ins[2]])
+                source = ins[0] | (ins[1] << 8)
+                src_value = bytearray([ins[0], ins[1]])
                 decoded_bytes += 2
             asm_instruction = AsmInstruction(
                 operation=operation,
@@ -173,30 +173,35 @@ def decode_instruction(encoding: FieldEncoding, pattern: DecodePattern, ins: byt
             if encoding.mod == 0b00:
                 byte_size = 'word' if encoding.w else 'byte'
                 if encoding.r_m == 0b110:
-                    destination = f'[{ins[2] | (ins[3] << 8)}]'
-                    dest_value = bytearray([ins[2], ins[3]])
+                    destination = f'[{ins[0] | (ins[1] << 8)}]'
+                    dest_value = bytearray([ins[0], ins[1]])
                     decoded_bytes += 2
                 else:
                     destination = '[' + R_M_TABLE[encoding.r_m] + ']'
                     dest_value = R_M_STORAGE[encoding.r_m]
             elif encoding.mod == 0b01:
                 byte_size = 'word' if encoding.w else 'byte'
-                destination = '[' + R_M_TABLE[encoding.r_m] + f' + {ins[2]}' + ']'
-                displacement = bytearray([ins[2]]) if encoding.w == 0 else bytearray([ins[2], 0x00])
+                destination = '[' + R_M_TABLE[encoding.r_m] + f' + {ins[0]}' + ']'
+                displacement = bytearray([ins[0]]) if encoding.w == 0 else bytearray([ins[0], 0x00])
                 dest_value = add_bytearrays(R_M_STORAGE[encoding.r_m], displacement)
                 decoded_bytes += 1
             elif encoding.mod == 0b10:
                 byte_size = 'word' # if encoding.w else 'byte'
-                destination = '[' + R_M_TABLE[encoding.r_m] + f' + {ins[2] | (ins[3] << 8)}' + ']'
-                dest_value = add_bytearrays(R_M_STORAGE[encoding.r_m], bytearray([ins[2], ins[3]]))
+                destination = '[' + R_M_TABLE[encoding.r_m] + f' + {ins[0] | (ins[1] << 8)}' + ']'
+                dest_value = add_bytearrays(R_M_STORAGE[encoding.r_m], bytearray([ins[0], ins[1]]))
                 decoded_bytes += 2
+            # Decode source
             if encoding.s == 0 and encoding.w == 1:
-                source = f'{ins[decoded_bytes] | (ins[decoded_bytes + 1] << 8)}'
-                src_value = bytearray([ins[decoded_bytes], ins[decoded_bytes + 1]])
+                source = ins[0] | (ins[1] << 8)
+                src_value = bytearray([ins[0], ins[1]])
                 decoded_bytes += 2 
+            elif encoding.s == 1 and encoding.w == 1:
+                source = ins[0]
+                src_value = bytearray([ins[0], bytearray(0x00)])
+                decoded_bytes += 1
             else:
-                source = f'{ins[decoded_bytes]}'
-                src_value = bytearray([ins[decoded_bytes]])
+                source = ins[0]
+                src_value = bytearray([ins[0]])
                 decoded_bytes += 1
             asm_instruction = AsmInstruction(
                 operation=operation,
@@ -212,14 +217,14 @@ def decode_instruction(encoding: FieldEncoding, pattern: DecodePattern, ins: byt
             if encoding.w == 0:
                 destination = 'al'
                 dest_value = REG_STORAGE[0][0] 
-                source = f'{ins[decoded_bytes]}'
-                src_value = bytearray([ins[decoded_bytes]])
+                source = f'{ins[0]}'
+                src_value = bytearray([ins[0]])
                 decoded_bytes += 1
             else:
                 destination = 'ax'
                 dest_value = REG_STORAGE[1][0]
-                source = f'{ins[decoded_bytes] | (ins[decoded_bytes + 1] << 8)}'
-                src_value = bytearray([ins[decoded_bytes], ins[decoded_bytes + 1]])
+                source = f'{ins[0] | (ins[1] << 8)}'
+                src_value = bytearray([ins[0], ins[1]])
                 decoded_bytes += 2
             asm_instruction = AsmInstruction(
                 operation=operation,
@@ -229,10 +234,10 @@ def decode_instruction(encoding: FieldEncoding, pattern: DecodePattern, ins: byt
                 src_value=src_value,
                 byte_size=byte_size
             )
-        
+
         elif pattern == DecodePattern.JUMP:
             operation = OP_TABLE[encoding.op]
-            dest_value = bytearray([ins[decoded_bytes]])
+            dest_value = bytearray([ins[0]])
             asm_instruction = AsmInstruction(
                 operation=operation,
                 dest_value=dest_value,
@@ -291,12 +296,13 @@ def decode(filename: str):
         instruction_start = DECODED_BYTES
         pattern = get_decode_pattern(ins[instruction_start:])
         encoding, decoded_bytes_1 = decode_field_encoding(ins[instruction_start:], pattern)
-        asm_instruction, decoded_bytes_2 = decode_instruction(encoding, pattern, ins[instruction_start:])
-        DECODED_BYTES += decoded_bytes_1 + decoded_bytes_2
+        DECODED_BYTES += decoded_bytes_1
+        asm_instruction, decoded_bytes_2 = decode_instruction(encoding, pattern, ins[DECODED_BYTES:])
+        DECODED_BYTES += decoded_bytes_2
         dest_init_value, asm_instruction = evaluate_instruction(asm_instruction)
 
         # Print the instruction and machine code
-        machine_code_str = ' '.join([f"{ins[i]:08b}" for i in range(DECODED_BYTES - instruction_start)])
+        machine_code_str = ' '.join([f"{ins[i]:08b}" for i in range(instruction_start, DECODED_BYTES)])
         asm_instruction_str = gen_assembly(asm_instruction)
         print("{:<{width}} | {}".format(asm_instruction_str, machine_code_str, width=INSTUCTION_SPACING))    
         print(f"{asm_instruction_str:<{INSTUCTION_SPACING}} | {asm_instruction.destination}:{format_bytearray(dest_init_value)} -> {format_bytearray(asm_instruction.dest_value)}")
