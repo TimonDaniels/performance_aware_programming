@@ -260,6 +260,11 @@ def evaluate_instruction(asm_instruction: AsmInstruction):
         asm_instruction.dest_value[:] = add_bytearrays(asm_instruction.dest_value, asm_instruction.src_value)
     elif asm_instruction.operation == 'sub':
         asm_instruction.dest_value[:] = add_bytearrays(asm_instruction.dest_value, asm_instruction.src_value)
+    elif asm_instruction.operation == 'cmp':
+        dest = asm_instruction.dest_value[:]
+        src = asm_instruction.src_value[:]
+        # if 
+
     elif asm_instruction.operation == 'jnz':
         IP_REG[:] = add_bytearrays(IP_REG, asm_instruction.dest_value) if is_bit_set(FLAGS_REG, 0) else IP_REG[:]
 
